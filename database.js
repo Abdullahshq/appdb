@@ -1,4 +1,3 @@
-// database.js
 import sql from 'mssql';
 
 let database = null;
@@ -39,11 +38,13 @@ export default class Database {
   async executeQuery(query) {
     const request = this.poolconnection.request();
     const result = await request.query(query);
+
     return result.rowsAffected[0];
   }
 
   async create(data) {
     const request = this.poolconnection.request();
+
     request.input('firstName', sql.NVarChar(255), data.firstName);
     request.input('lastName', sql.NVarChar(255), data.lastName);
 
@@ -57,6 +58,7 @@ export default class Database {
   async readAll() {
     const request = this.poolconnection.request();
     const result = await request.query(`SELECT * FROM Person`);
+
     return result.recordsets[0];
   }
 
@@ -71,6 +73,7 @@ export default class Database {
 
   async update(id, data) {
     const request = this.poolconnection.request();
+
     request.input('id', sql.Int, +id);
     request.input('firstName', sql.NVarChar(255), data.firstName);
     request.input('lastName', sql.NVarChar(255), data.lastName);
@@ -83,20 +86,17 @@ export default class Database {
   }
 
   async delete(id) {
+    const idAsNumber = Number(id);
+
     const request = this.poolconnection.request();
     const result = await request
-      .input('id', sql.Int, +id)
+      .input('id', sql.Int, idAsNumber)
       .query(`DELETE FROM Person WHERE id = @id`);
 
     return result.rowsAffected[0];
   }
 
   async createTable() {
-    if (!this.connected) {
-      console.error('Cannot create table: No database connection.');
-      return;
-    }
-
     if (process.env.NODE_ENV === 'development') {
       this.executeQuery(
         `IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Person')
@@ -112,29 +112,16 @@ export default class Database {
           console.log('Table created');
         })
         .catch((err) => {
+          // Table may already exist
           console.error(`Error creating table: ${err}`);
         });
     }
   }
 }
 
-// ✅ MSI-based Azure SQL connection config
-const config = {
-  server: 'abddatabase.database.windows.net',
-  database: 'abddb',
-  authentication: {
-    type: 'azure-active-directory-msi-app' // System-assigned identity
-  },
-  options: {
-    encrypt: true,
-    trustServerCertificate: false
-  }
-};
-
-// ✅ Connection initializer
-export const createDatabaseConnection = async () => {
-  database = new Database(config);
+export const createDatabaseConnection = async (passwordConfig) => {
+  database = new Database(passwordConfig);
   await database.connect();
-  await database.createTable(); // Optional
+  await database.createTable();
   return database;
 };
